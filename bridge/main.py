@@ -18,8 +18,8 @@ INFLUXDB_DATABASE = 'home_db'
 MQTT_ADDRESS = 'mosquitto'
 MQTT_USER = 'mqttuser'
 MQTT_PASSWORD = 'mqttpassword'
-MQTT_TOPIC = 'home/+/+'
-MQTT_REGEX = 'home/([^/]+)/([^/]+)'
+MQTT_TOPIC = '+/+/+'
+MQTT_REGEX = '([^/]+)/([^/]+)/([^/]+)'
 MQTT_CLIENT_ID = 'MQTTInfluxDBBridge'
 
 influxdb_client = InfluxDBClient(INFLUXDB_ADDRESS, 8086, INFLUXDB_USER, INFLUXDB_PASSWORD, None)
@@ -27,6 +27,7 @@ influxdb_client = InfluxDBClient(INFLUXDB_ADDRESS, 8086, INFLUXDB_USER, INFLUXDB
 
 class SensorData(NamedTuple):
     location: str
+    sensor: str
     measurement: str
     value: float
 
@@ -49,15 +50,16 @@ def on_message(client, userdata, msg):
 
 def _parse_mqtt_message(topic, payload):
     match = re.match(MQTT_REGEX, topic)
-    print(match)
     if match:
         location = match.group(1)
-        measurement = match.group(2)
+        sensor = match.group(2)
+        measurement = match.group(3)
         print(location)
+        print(sensor)
         print(measurement)
         if measurement == 'status':
             return None
-        return SensorData(location, measurement, float(payload.decode("UTF-8").strip('\x00')))
+        return SensorData(location, sensor,  measurement, float(payload.decode("UTF-8").strip('\x00')))
     else:
         return None
 
@@ -67,14 +69,15 @@ def _send_sensor_data_to_influxdb(sensor_data):
         {
             'measurement': sensor_data.measurement,
             'tags': {
-                'location': sensor_data.location
+                'location': sensor_data.location,
+                'sensor': sensor_data.sensor
             },
             'fields': {
                 'value': sensor_data.value
             }
         }
     ]
-    print("write into db")
+    print(json_body);
     influxdb_client.write_points(json_body)
 
 
